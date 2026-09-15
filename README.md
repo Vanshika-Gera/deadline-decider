@@ -1,29 +1,42 @@
-# Welcome to your Lovable project
+# Deadline Decider
 
-This project was built with [Lovable](https://lovable.dev).
+A simple web tool that helps students figure out whether they can realistically finish their workload before a deadline.
 
-## Build with Lovable
+## What it does
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Deadline Decider takes:
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- Total amount of work
+- Amount already completed
+- Time remaining
+- Available working hours per day
+- Estimated working speed
+- Unit of work (pages, problems, chapters, words, slides, exercises, tasks, or a custom unit)
+
+It then calculates:
+
+- Remaining work
+- Required work per day
+- Required work per hour
+- Estimated time needed at the current pace
+- Progress toward completion
+- A simple deadline assessment
+
+## Why I built it
+
+It is easy to know that you have "a lot to do" without knowing whether your deadline is actually manageable. Deadline Decider turns that vague feeling into concrete numbers that can be acted on.
+
+## Tech Stack
+
+- TypeScript
+- React
+- TanStack Start
+- Tailwind CSS
+- Vite
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Install dependencies:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+npm install
