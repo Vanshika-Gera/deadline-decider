@@ -555,6 +555,9 @@ function Index() {
             </div>
           </div>
         </section>
+        <footer className="mt-8 border-t border-white/10 pt-6 text-center text-xs text-white/30">
+        Built to turn deadline panic into actual numbers.
+        </footer>
       </main>
     </>
   );
