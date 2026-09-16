@@ -23,14 +23,6 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-/*
- * ============================================================
- * CALCULATION LOGIC
- * ============================================================
- * This is the heart of the app. Edit the thresholds and messages
- * below to change how verdicts are decided.
- */
-
 type Verdict = "fine" | "tight" | "crunch" | "cooked";
 
 const PRESET_UNITS = [
@@ -67,51 +59,78 @@ function calculateDeadline(inputs: {
   const { total, completed, days, hoursPerDay, speed, unit } = inputs;
 
   // Basic validation
-  const values = [total, completed, days, hoursPerDay, speed];
-  if (values.some((v) => !Number.isFinite(v) || v < 0)) return null;
-  if (completed > total) return null;
-  if (days === 0 || hoursPerDay === 0 || speed === 0) return null;
+  if (!Number.isFinite(total) || total <= 0) {
+    return null;
+  }
+
+  if (!Number.isFinite(completed) || completed < 0 || completed > total) {
+    return null;
+  }
+
+  if (!Number.isFinite(days) || days <= 0) {
+    return null;
+  }
+
+  if (!Number.isFinite(hoursPerDay) || hoursPerDay <= 0) {
+    return null;
+  }
+
+  if (!Number.isFinite(speed) || speed <= 0) {
+    return null;
+  }
 
   const remaining = total - completed;
   const availableHours = days * hoursPerDay;
   const requiredDaily = remaining / days;
   const requiredHourly = remaining / availableHours;
   const timeNeeded = remaining / speed;
-  const progressPercent = total > 0 ? (completed / total) * 100 : 0;
+  const progressPercent = (completed / total) * 100;
 
-  // How much harder you need to work compared to your usual pace.
-  // 1.0 = exactly your pace. Higher = faster than usual.
+  // Compare the required pace to the user's usual pace.
+  // 1.0 = exactly their usual pace.
+  // Above 1.0 = they need to work faster than usual.
   const paceRatio = requiredHourly / speed;
 
-  // --- Verdict thresholds: tweak these to taste ---
   let verdict: Verdict;
   let verdictTitle: string;
   let verdictMessage: string;
 
-  if (paceRatio <= 0.7) {
+  if (remaining === 0) {
+    verdict = "fine";
+    verdictTitle = "You're done.";
+    verdictMessage = "Nothing left to do. You survived.";
+  } else if (paceRatio <= 0.7) {
     verdict = "fine";
     verdictTitle = "You're fine.";
     verdictMessage = `You need ${formatNumber(
       requiredHourly
-    )} ${unit}/hour — well below your usual ${formatNumber(speed)}/hour pace.`;
+    )} ${unit}/hour — well below your usual ${formatNumber(
+      speed
+    )}/hour pace.`;
   } else if (paceRatio <= 1.0) {
     verdict = "tight";
     verdictTitle = "Getting tight.";
     verdictMessage = `You need ${formatNumber(
       requiredHourly
-    )} ${unit}/hour to match your usual ${formatNumber(speed)}/hour pace. Stay focused.`;
+    )} ${unit}/hour to match your usual ${formatNumber(
+      speed
+    )}/hour pace. Stay focused.`;
   } else if (paceRatio <= 1.3) {
     verdict = "crunch";
     verdictTitle = "Crunch time.";
     verdictMessage = `You need ${formatNumber(
       requiredHourly
-    )} ${unit}/hour — ${formatNumber(paceRatio)}× your usual pace. Push hard.`;
+    )} ${unit}/hour — ${formatNumber(
+      paceRatio
+    )}× your usual pace. Push hard.`;
   } else {
     verdict = "cooked";
     verdictTitle = "You are cooked.";
     verdictMessage = `You need ${formatNumber(
       requiredHourly
-    )} ${unit}/hour — ${formatNumber(paceRatio)}× your usual pace. Something has to give.`;
+    )} ${unit}/hour — ${formatNumber(
+      paceRatio
+    )}× your usual pace. Something has to give.`;
   }
 
   return {
@@ -131,12 +150,6 @@ function calculateDeadline(inputs: {
 function formatNumber(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
-
-/*
- * ============================================================
- * UI
- * ============================================================
- */
 
 const defaultInputs = {
   total: "",
@@ -158,24 +171,95 @@ function Index() {
     if (selectedUnit === "custom") {
       return customUnit.trim() || "items";
     }
+
     return selectedUnit;
   }, [selectedUnit, customUnit]);
 
   function updateInput(key: keyof typeof inputs, value: string) {
-    setInputs((prev) => ({ ...prev, [key]: value }));
+    setInputs((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+
     setError(null);
   }
 
   function handleCalculate() {
-    const parsed = {
-      total: parseFloat(inputs.total),
-      completed: parseFloat(inputs.completed),
-      days: parseFloat(inputs.days),
-      hoursPerDay: parseFloat(inputs.hoursPerDay),
-      speed: parseFloat(inputs.speed),
-      unit: activeUnit,
-    };
+    const total = parseFloat(inputs.total);
+    const completed = parseFloat(inputs.completed);
+    const days = parseFloat(inputs.days);
+    const hoursPerDay = parseFloat(inputs.hoursPerDay);
+    const speed = parseFloat(inputs.speed);
 
+    // Check for missing or invalid numbers.
+    if (
+      !Number.isFinite(total) ||
+      !Number.isFinite(completed) ||
+      !Number.isFinite(days) ||
+      !Number.isFinite(hoursPerDay) ||
+      !Number.isFinite(speed)
+    ) {
+      setError("Please fill in all fields with valid numbers.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Total amount of work must be greater than zero.
+    if (total <= 0) {
+      setError("Total amount of work must be greater than 0.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Completed work can be zero.
+    if (completed < 0) {
+      setError("Completed work can't be negative.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Completed work cannot exceed the total.
+    if (completed > total) {
+      setError(
+        `You can't have completed ${formatNumber(
+          completed
+        )} ${activeUnit} when the total is only ${formatNumber(
+          total
+        )} ${activeUnit}.`
+      );
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Time remaining must be positive.
+    if (days <= 0) {
+      setError("Time remaining must be greater than 0.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Available working hours must be positive.
+    if (hoursPerDay <= 0) {
+      setError("Hours per day must be greater than 0.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // Working speed must be positive.
+    if (speed <= 0) {
+      setError("Estimated working speed must be greater than 0.");
+      setShowResult(false);
+      setResult(null);
+      return;
+    }
+
+    // A custom unit must have a name.
     if (selectedUnit === "custom" && !customUnit.trim()) {
       setError("Please enter a custom unit (e.g. words, slides).");
       setShowResult(false);
@@ -183,10 +267,17 @@ function Index() {
       return;
     }
 
-    const outcome = calculateDeadline(parsed);
+    const outcome = calculateDeadline({
+      total,
+      completed,
+      days,
+      hoursPerDay,
+      speed,
+      unit: activeUnit,
+    });
 
     if (!outcome) {
-      setError("Please fill in every field with valid positive numbers.");
+      setError("Something went wrong while calculating your deadline.");
       setShowResult(false);
       setResult(null);
       return;
@@ -211,9 +302,11 @@ function Index() {
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white/60">
             Panic math, served cold
           </div>
+
           <h1 className="font-display text-6xl font-extrabold tracking-tight text-white md:text-7xl">
             AM I COOKED?
           </h1>
+
           <p className="mt-4 text-lg text-white/60">
             Put in the numbers. We&apos;ll do the panic math.
           </p>
@@ -239,6 +332,7 @@ function Index() {
                 onCustomUnitChange={setCustomUnit}
                 showUnitSelector
               />
+
               <WorkField
                 label="Amount already completed"
                 placeholder="12"
@@ -259,6 +353,7 @@ function Index() {
                   value={inputs.days}
                   onChange={(v) => updateInput("days", v)}
                 />
+
                 <NumberField
                   label="Hours per day"
                   unit="hours"
@@ -278,7 +373,12 @@ function Index() {
             </div>
 
             {error && (
-              <p className="mt-4 text-sm text-verdict-cooked">{error}</p>
+              <p
+                role="alert"
+                className="mt-4 text-sm text-verdict-cooked"
+              >
+                {error}
+              </p>
             )}
 
             <button
@@ -316,12 +416,6 @@ function Index() {
   );
 }
 
-/*
- * ============================================================
- * UI COMPONENTS
- * ============================================================
- */
-
 function WorkField({
   label,
   placeholder,
@@ -348,6 +442,7 @@ function WorkField({
   return (
     <label className="block">
       <span className="text-xs text-white/50">{label}</span>
+
       <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
         <input
           type="number"
@@ -359,6 +454,7 @@ function WorkField({
           onChange={(e) => onValueChange(e.target.value)}
           className="w-full bg-transparent text-white placeholder-white/30 outline-none"
         />
+
         {showUnitSelector ? (
           <div className="flex items-center gap-2">
             <select
@@ -372,10 +468,12 @@ function WorkField({
                   {u}
                 </option>
               ))}
+
               <option value="custom" className="bg-[#0c0b14]">
                 custom
               </option>
             </select>
+
             {selectedUnit === "custom" && (
               <input
                 type="text"
@@ -388,7 +486,9 @@ function WorkField({
             )}
           </div>
         ) : (
-          <span className="whitespace-nowrap text-sm text-white/40">{unit}</span>
+          <span className="whitespace-nowrap text-sm text-white/40">
+            {unit}
+          </span>
         )}
       </div>
     </label>
@@ -411,6 +511,7 @@ function NumberField({
   return (
     <label className="block">
       <span className="text-xs text-white/50">{label}</span>
+
       <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
         <input
           type="number"
@@ -422,7 +523,10 @@ function NumberField({
           onChange={(e) => onChange(e.target.value)}
           className="w-full bg-transparent text-white placeholder-white/30 outline-none"
         />
-        <span className="whitespace-nowrap text-sm text-white/40">{unit}</span>
+
+        <span className="whitespace-nowrap text-sm text-white/40">
+          {unit}
+        </span>
       </div>
     </label>
   );
@@ -432,8 +536,10 @@ function VerdictCard({ result }: { result: CalculationResult }) {
   const verdictStyles: Record<Verdict, string> = {
     fine: "border-verdict-fine/40 bg-verdict-fine/10 text-verdict-fine",
     tight: "border-verdict-tight/40 bg-verdict-tight/10 text-verdict-tight",
-    crunch: "border-verdict-crunch/40 bg-verdict-crunch/10 text-verdict-crunch",
-    cooked: "border-verdict-cooked/40 bg-verdict-cooked/10 text-verdict-cooked",
+    crunch:
+      "border-verdict-crunch/40 bg-verdict-crunch/10 text-verdict-crunch",
+    cooked:
+      "border-verdict-cooked/40 bg-verdict-cooked/10 text-verdict-cooked",
   };
 
   return (
@@ -443,37 +549,51 @@ function VerdictCard({ result }: { result: CalculationResult }) {
       <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
         Panic report
       </div>
+
       <div className="mt-1 font-display text-4xl font-extrabold text-white">
         {result.verdictTitle}
       </div>
-      <p className="mt-2 text-sm text-white/60">{result.verdictMessage}</p>
+
+      <p className="mt-2 text-sm text-white/60">
+        {result.verdictMessage}
+      </p>
     </div>
   );
 }
 
 function ProgressBar({ result }: { result: CalculationResult }) {
+  const completedPercent = Math.min(
+    Math.max(result.progressPercent, 0),
+    100
+  );
+
+  const remainingPercent = 100 - completedPercent;
+
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="mb-2 flex justify-between text-xs text-white/50">
         <span>Completed</span>
         <span>Remaining</span>
       </div>
+
       <div className="flex h-3 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full bg-verdict-fine progress-fill"
-          style={{ width: `${Math.min(result.progressPercent, 100)}%` }}
+          className="progress-fill h-full bg-verdict-fine"
+          style={{ width: `${completedPercent}%` }}
         />
+
         <div
-          className="h-full bg-verdict-cooked/70 progress-fill"
+          className="progress-fill h-full bg-verdict-cooked/70"
           style={{
-            width: `${Math.max(0, 100 - result.progressPercent)}%`,
+            width: `${remainingPercent}%`,
             animationDelay: "0.15s",
           }}
         />
       </div>
+
       <div className="mt-2 flex justify-between text-xs text-white/40">
-        <span>{formatNumber(result.progressPercent)}% done</span>
-        <span>{formatNumber(100 - result.progressPercent)}% left</span>
+        <span>{formatNumber(completedPercent)}% done</span>
+        <span>{formatNumber(remainingPercent)}% left</span>
       </div>
     </div>
   );
@@ -481,6 +601,7 @@ function ProgressBar({ result }: { result: CalculationResult }) {
 
 function StatsGrid({ result }: { result: CalculationResult }) {
   const { unit } = result;
+
   const stats = [
     {
       label: "Required daily pace",
@@ -512,9 +633,12 @@ function StatsGrid({ result }: { result: CalculationResult }) {
           className="rounded-xl border border-white/10 bg-white/5 p-4"
         >
           <div className="text-xs text-white/50">{stat.label}</div>
+
           <div className="mt-1 font-display text-2xl font-bold text-white">
             {stat.value}{" "}
-            <span className="text-sm font-normal text-white/40">{stat.unit}</span>
+            <span className="text-sm font-normal text-white/40">
+              {stat.unit}
+            </span>
           </div>
         </div>
       ))}
