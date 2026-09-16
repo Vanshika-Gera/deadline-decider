@@ -28,7 +28,7 @@ type Verdict = "fine" | "tight" | "crunch" | "cooked" | "math";
 const PRESET_UNITS = [
   "pages",
   "problems",
-  "chapters",
+  "chapters", 
   "words",
   "slides",
   "exercises",
@@ -58,25 +58,11 @@ function calculateDeadline(inputs: {
 }): CalculationResult | null {
   const { total, completed, days, hoursPerDay, speed, unit } = inputs;
 
-  if (!Number.isFinite(total) || total <= 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(completed) || completed < 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(days) || days <= 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(hoursPerDay) || hoursPerDay <= 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(speed) || speed <= 0) {
-    return null;
-  }
+  if (!Number.isFinite(total) || total <= 0) return null;
+  if (!Number.isFinite(completed) || completed < 0) return null;
+  if (!Number.isFinite(days) || days <= 0) return null;
+  if (!Number.isFinite(hoursPerDay) || hoursPerDay <= 0) return null;
+  if (!Number.isFinite(speed) || speed <= 0) return null;
 
   const remaining = total - completed;
   const availableHours = days * hoursPerDay;
@@ -183,10 +169,7 @@ function Index() {
   const [showResult, setShowResult] = useState(false);
 
   const activeUnit = useMemo(() => {
-    if (selectedUnit === "custom") {
-      return customUnit.trim() || "items";
-    }
-
+    if (selectedUnit === "custom") return customUnit.trim() || "items";
     return selectedUnit;
   }, [selectedUnit, customUnit]);
 
@@ -195,8 +178,16 @@ function Index() {
       ...prev,
       [key]: value,
     }));
-
     setError(null);
+  }
+
+  function handleReset() {
+    setInputs(defaultInputs);
+    setSelectedUnit("pages");
+    setCustomUnit("");
+    setResult(null);
+    setError(null);
+    setShowResult(false);
   }
 
   function handleCalculate() {
@@ -225,14 +216,6 @@ function Index() {
       setResult(null);
       return;
     }
-
-    /*
-     * FUN SANITY CHECKS
-     *
-     * These run before the normal deadline calculation.
-     * The goal is to catch numbers that are technically input values
-     * but don't make logical sense.
-     */
 
     if (total <= 0) {
       setResult(
@@ -328,13 +311,6 @@ function Index() {
       setError(null);
       return;
     }
-
-    /*
-     * ABSURD BUT TECHNICALLY VALID INPUTS
-     *
-     * These don't make the calculation mathematically invalid,
-     * but they are funny enough to deserve a warning.
-     */
 
     if (total >= 10000 && days <= 1) {
       setResult(
@@ -480,13 +456,23 @@ function Index() {
               </p>
             )}
 
-            <button
-              type="button"
-              onClick={handleCalculate}
-              className="mt-7 w-full rounded-xl bg-gradient-to-r from-primary to-[#a855f7] py-3.5 font-display font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110"
-            >
-              Calculate my fate
-            </button>
+            <div className="mt-7 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <button
+                type="button"
+                onClick={handleCalculate}
+                className="w-full rounded-xl bg-gradient-to-r from-primary to-[#a855f7] py-3.5 font-display font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110"
+              >
+                Calculate my fate
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3.5 font-display font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                Reset
+              </button>
+            </div>
           </section>
 
           <section className="rounded-3xl border border-white/15 bg-white/10 p-7 shadow-2xl shadow-black/40 backdrop-blur-2xl">
