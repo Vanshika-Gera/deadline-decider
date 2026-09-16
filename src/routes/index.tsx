@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-type Verdict = "fine" | "tight" | "crunch" | "cooked";
+type Verdict = "fine" | "tight" | "crunch" | "cooked" | "math";
 
 const PRESET_UNITS = [
   "pages",
@@ -58,12 +58,11 @@ function calculateDeadline(inputs: {
 }): CalculationResult | null {
   const { total, completed, days, hoursPerDay, speed, unit } = inputs;
 
-  // Basic validation
   if (!Number.isFinite(total) || total <= 0) {
     return null;
   }
 
-  if (!Number.isFinite(completed) || completed < 0 || completed > total) {
+  if (!Number.isFinite(completed) || completed < 0) {
     return null;
   }
 
@@ -86,9 +85,6 @@ function calculateDeadline(inputs: {
   const timeNeeded = remaining / speed;
   const progressPercent = (completed / total) * 100;
 
-  // Compare the required pace to the user's usual pace.
-  // 1.0 = exactly their usual pace.
-  // Above 1.0 = they need to work faster than usual.
   const paceRatio = requiredHourly / speed;
 
   let verdict: Verdict;
@@ -147,6 +143,25 @@ function calculateDeadline(inputs: {
   };
 }
 
+function createMathResult(
+  title: string,
+  message: string,
+  unit: string
+): CalculationResult {
+  return {
+    remaining: 0,
+    requiredDaily: 0,
+    requiredHourly: 0,
+    timeNeeded: 0,
+    availableHours: 0,
+    progressPercent: 0,
+    unit,
+    verdict: "math",
+    verdictTitle: title,
+    verdictMessage: message,
+  };
+}
+
 function formatNumber(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
@@ -191,7 +206,6 @@ function Index() {
     const hoursPerDay = parseFloat(inputs.hoursPerDay);
     const speed = parseFloat(inputs.speed);
 
-    // Check for missing or invalid numbers.
     if (
       !Number.isFinite(total) ||
       !Number.isFinite(completed) ||
@@ -205,65 +219,152 @@ function Index() {
       return;
     }
 
-    // Total amount of work must be greater than zero.
-    if (total <= 0) {
-      setError("Total amount of work must be greater than 0.");
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // Completed work can be zero.
-    if (completed < 0) {
-      setError("Completed work can't be negative.");
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // Completed work cannot exceed the total.
-    if (completed > total) {
-      setError(
-        `You can't have completed ${formatNumber(
-          completed
-        )} ${activeUnit} when the total is only ${formatNumber(
-          total
-        )} ${activeUnit}.`
-      );
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // Time remaining must be positive.
-    if (days <= 0) {
-      setError("Time remaining must be greater than 0.");
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // Available working hours must be positive.
-    if (hoursPerDay <= 0) {
-      setError("Hours per day must be greater than 0.");
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // Working speed must be positive.
-    if (speed <= 0) {
-      setError("Estimated working speed must be greater than 0.");
-      setShowResult(false);
-      setResult(null);
-      return;
-    }
-
-    // A custom unit must have a name.
     if (selectedUnit === "custom" && !customUnit.trim()) {
       setError("Please enter a custom unit (e.g. words, slides).");
       setShowResult(false);
       setResult(null);
+      return;
+    }
+
+    /*
+     * FUN SANITY CHECKS
+     *
+     * These run before the normal deadline calculation.
+     * The goal is to catch numbers that are technically input values
+     * but don't make logical sense.
+     */
+
+    if (total <= 0) {
+      setResult(
+        createMathResult(
+          "Your maths is cooked.",
+          "A workload of zero doesn't exactly require a panic calculator. Try entering some actual work.",
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (completed < 0) {
+      setResult(
+        createMathResult(
+          "You completed WHAT?",
+          `Negative ${activeUnit} completed is a little beyond our current understanding of mathematics.`,
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (completed > total) {
+      setResult(
+        createMathResult(
+          "Your maths is cooked.",
+          `You somehow completed ${formatNumber(
+            completed
+          )} ${activeUnit} out of ${formatNumber(
+            total
+          )} ${activeUnit}. Impressive. Concerning. Please check your numbers.`,
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (days <= 0) {
+      setResult(
+        createMathResult(
+          "Time is apparently optional.",
+          "You gave yourself zero days. Unfortunately, deadlines remain annoyingly attached to the concept of time.",
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (hoursPerDay <= 0) {
+      setResult(
+        createMathResult(
+          "Those are some impressive study hours.",
+          "You entered zero hours per day. Unless you're planning to finish everything telepathically, try again.",
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (hoursPerDay > 24) {
+      setResult(
+        createMathResult(
+          "You are not studying. You are becoming the textbook.",
+          "There are only 24 hours in a day. I checked.",
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (speed <= 0) {
+      setResult(
+        createMathResult(
+          "At this speed, we're both cooked.",
+          "Your estimated working speed is zero. The deadline is not going to wait for you to discover teleportation.",
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    /*
+     * ABSURD BUT TECHNICALLY VALID INPUTS
+     *
+     * These don't make the calculation mathematically invalid,
+     * but they are funny enough to deserve a warning.
+     */
+
+    if (total >= 10000 && days <= 1) {
+      setResult(
+        createMathResult(
+          "Bestie. Be so for real.",
+          `${formatNumber(
+            total
+          )} ${activeUnit} in ${formatNumber(
+            days
+          )} day? This is no longer a productivity problem.`,
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
+      return;
+    }
+
+    if (speed >= 1000) {
+      setResult(
+        createMathResult(
+          "Okay, Superman.",
+          `${formatNumber(
+            speed
+          )} ${activeUnit}/hour? Either you're incredibly efficient or something has gone horribly wrong.`,
+          activeUnit
+        )
+      );
+      setShowResult(true);
+      setError(null);
       return;
     }
 
@@ -290,7 +391,6 @@ function Index() {
 
   return (
     <>
-      {/* Aurora background */}
       <div className="bg-aurora" aria-hidden="true">
         <div className="orb orb-1" />
         <div className="orb orb-2" />
@@ -313,7 +413,6 @@ function Index() {
         </header>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Input form */}
           <section className="rounded-3xl border border-white/15 bg-white/10 p-7 shadow-2xl shadow-black/40 backdrop-blur-2xl">
             <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-white/50">
               The inputs
@@ -390,7 +489,6 @@ function Index() {
             </button>
           </section>
 
-          {/* Results */}
           <section className="rounded-3xl border border-white/15 bg-white/10 p-7 shadow-2xl shadow-black/40 backdrop-blur-2xl">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-white/50">
               The verdict
@@ -405,12 +503,72 @@ function Index() {
             ) : result ? (
               <div className="result-reveal space-y-5">
                 <VerdictCard result={result} />
-                <ProgressBar result={result} />
-                <StatsGrid result={result} />
+
+                {result.verdict !== "math" && (
+                  <>
+                    <ProgressBar result={result} />
+                    <StatsGrid result={result} />
+                  </>
+                )}
               </div>
             ) : null}
           </section>
         </div>
+
+        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur-xl">
+          <h2 className="text-center font-display text-2xl font-bold text-white">
+            What does "cooked" actually mean?
+          </h2>
+
+          <p className="mt-2 text-center text-sm text-white/40">
+            The verdict is based on how your required pace compares with your
+            usual pace.
+          </p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-verdict-fine/30 bg-verdict-fine/10 p-4">
+              <div className="font-display text-lg font-bold text-verdict-fine">
+                You&apos;re fine.
+              </div>
+
+              <p className="mt-2 text-sm leading-relaxed text-white/55">
+                You have plenty of room to finish at your current pace.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-verdict-tight/30 bg-verdict-tight/10 p-4">
+              <div className="font-display text-lg font-bold text-verdict-tight">
+                Getting tight.
+              </div>
+
+              <p className="mt-2 text-sm leading-relaxed text-white/55">
+                You can still finish, but you&apos;ll need to stay consistent.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-verdict-crunch/30 bg-verdict-crunch/10 p-4">
+              <div className="font-display text-lg font-bold text-verdict-crunch">
+                Crunch time.
+              </div>
+
+              <p className="mt-2 text-sm leading-relaxed text-white/55">
+                You can finish, but you&apos;ll need to work harder than your
+                usual pace.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-verdict-cooked/30 bg-verdict-cooked/10 p-4">
+              <div className="font-display text-lg font-bold text-verdict-cooked">
+                You are cooked.
+              </div>
+
+              <p className="mt-2 text-sm leading-relaxed text-white/55">
+                At your current pace, you can&apos;t finish everything before
+                the deadline.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
     </>
   );
@@ -540,6 +698,7 @@ function VerdictCard({ result }: { result: CalculationResult }) {
       "border-verdict-crunch/40 bg-verdict-crunch/10 text-verdict-crunch",
     cooked:
       "border-verdict-cooked/40 bg-verdict-cooked/10 text-verdict-cooked",
+    math: "border-purple-400/40 bg-purple-400/10 text-purple-300",
   };
 
   return (
@@ -547,7 +706,7 @@ function VerdictCard({ result }: { result: CalculationResult }) {
       className={`rounded-2xl border p-5 ${verdictStyles[result.verdict]}`}
     >
       <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
-        Panic report
+        {result.verdict === "math" ? "Math emergency" : "Panic report"}
       </div>
 
       <div className="mt-1 font-display text-4xl font-extrabold text-white">
