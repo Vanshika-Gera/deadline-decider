@@ -468,8 +468,8 @@ function Index() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3.5 font-display font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-              >
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3.5 font-display font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                >
                 Reset
               </button>
             </div>
